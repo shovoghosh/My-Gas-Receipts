@@ -25,7 +25,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   String? _previewPath;
   bool _isProcessing = false;
   bool _isScanning = false;
-  String _category = ExpenseCategory.gas;
+  String _category = 'gas';
   int? _vehicleId;
 
   final ImageService _imageService = ImageService();
@@ -134,6 +134,31 @@ class _CaptureScreenState extends State<CaptureScreen> {
     super.dispose();
   }
 
+  List<DropdownMenuItem<String>> _buildCategoryItems(ReceiptProvider provider) {
+    final builtIn = ['gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other'];
+    final allIds = [
+      ...builtIn,
+      ...provider.customCategories.map((c) => c.id),
+    ];
+
+    return allIds.map((id) {
+      return DropdownMenuItem(
+        value: id,
+        child: Row(
+          children: [
+            Icon(
+              CategoryManager.icon(id, provider.customCategories),
+              color: CategoryManager.color(id, provider.customCategories),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(CategoryManager.displayName(id, provider.customCategories)),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ReceiptProvider>();
@@ -179,22 +204,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       labelText: 'Category',
                       border: OutlineInputBorder(),
                     ),
-                    items: ExpenseCategory.all.map((c) {
-                      return DropdownMenuItem(
-                        value: c,
-                        child: Row(
-                          children: [
-                            Icon(
-                              ExpenseCategory.icon(c),
-                              color: ExpenseCategory.color(c),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(ExpenseCategory.displayName(c)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                    items: _buildCategoryItems(provider),
                     onChanged: (v) => setState(() => _category = v!),
                   ),
                   const SizedBox(height: 12),
@@ -233,10 +243,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _stationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Station Name',
-                      prefixIcon: Icon(Icons.local_gas_station),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: CategoryManager.vendorLabel(_category),
+                      prefixIcon: Icon(CategoryManager.vendorIcon(_category)),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),

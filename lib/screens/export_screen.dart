@@ -20,7 +20,37 @@ class _ExportScreenState extends State<ExportScreen> {
   bool _isPdf = true;
   bool _archiveAfterExport = false;
   String? _selectedCategory;
-  int? _selectedVehicleId;
+
+  List<DropdownMenuItem<String?>> _buildCategoryItems(ReceiptProvider provider) {
+    final builtIn = ['gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other'];
+    final allIds = [
+      ...builtIn,
+      ...provider.customCategories.map((c) => c.id),
+    ];
+
+    return [
+      const DropdownMenuItem(
+        value: null,
+        child: Text('All Categories'),
+      ),
+      ...allIds.map((id) {
+        return DropdownMenuItem(
+          value: id,
+          child: Row(
+            children: [
+              Icon(
+                CategoryManager.icon(id, provider.customCategories),
+                color: CategoryManager.color(id, provider.customCategories),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(CategoryManager.displayName(id, provider.customCategories)),
+            ],
+          ),
+        );
+      }),
+    ];
+  }  int? _selectedVehicleId;
 
   Future<void> _pickStartDate() async {
     final picked = await showDatePicker(
@@ -196,18 +226,7 @@ class _ExportScreenState extends State<ExportScreen> {
                 labelText: 'Category Filter',
                 border: OutlineInputBorder(),
               ),
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text('All Categories'),
-                ),
-                ...ExpenseCategory.all.map((c) {
-                  return DropdownMenuItem(
-                    value: c,
-                    child: Text(ExpenseCategory.displayName(c)),
-                  );
-                }),
-              ],
+              items: _buildCategoryItems(provider),
               onChanged: (v) => setState(() => _selectedCategory = v),
             ),
             const SizedBox(height: 16),

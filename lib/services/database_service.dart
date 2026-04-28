@@ -176,6 +176,16 @@ class DatabaseService {
     return maps.map((m) => Receipt.fromMap(m)).toList();
   }
 
+  Future<void> updateReceipt(Receipt receipt) async {
+    final db = await database;
+    await db.update(
+      'receipts',
+      receipt.toMap(),
+      where: 'id = ?',
+      whereArgs: [receipt.id],
+    );
+  }
+
   Future<void> deleteReceipt(int id) async {
     final db = await database;
     await db.delete('receipts', where: 'id = ?', whereArgs: [id]);

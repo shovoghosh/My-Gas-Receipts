@@ -19,7 +19,7 @@ class _BatchImportScreenState extends State<BatchImportScreen> {
   bool _isLoading = false;
   bool _isSaving = false;
 
-  String _category = ExpenseCategory.gas;
+  String _category = 'gas';
   DateTime _selectedDate = DateTime.now();
   final _amountController = TextEditingController();
   final _stationController = TextEditingController();
@@ -93,6 +93,31 @@ class _BatchImportScreenState extends State<BatchImportScreen> {
     _amountController.dispose();
     _stationController.dispose();
     super.dispose();
+  }
+
+  List<DropdownMenuItem<String>> _buildCategoryItems(ReceiptProvider provider) {
+    final builtIn = ['gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other'];
+    final allIds = [
+      ...builtIn,
+      ...provider.customCategories.map((c) => c.id),
+    ];
+
+    return allIds.map((id) {
+      return DropdownMenuItem(
+        value: id,
+        child: Row(
+          children: [
+            Icon(
+              CategoryManager.icon(id, provider.customCategories),
+              color: CategoryManager.color(id, provider.customCategories),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(CategoryManager.displayName(id, provider.customCategories)),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   @override
@@ -176,22 +201,7 @@ class _BatchImportScreenState extends State<BatchImportScreen> {
                             labelText: 'Category',
                             border: OutlineInputBorder(),
                           ),
-                          items: ExpenseCategory.all.map((c) {
-                            return DropdownMenuItem(
-                              value: c,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    ExpenseCategory.icon(c),
-                                    color: ExpenseCategory.color(c),
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(ExpenseCategory.displayName(c)),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                          items: _buildCategoryItems(context.read<ReceiptProvider>()),
                           onChanged: (v) => setState(() => _category = v!),
                         ),
                         const SizedBox(height: 12),

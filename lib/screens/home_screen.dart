@@ -4,10 +4,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/expense_category.dart';
+import '../models/receipt.dart';
 import '../providers/receipt_provider.dart';
 import '../services/csv_service.dart';
 import '../services/pdf_service.dart';
 import 'capture_screen.dart';
+import 'categories_screen.dart';
 import 'export_screen.dart';
 import 'mileage_screen.dart';
 import 'settings_screen.dart';
@@ -39,97 +41,81 @@ class HomeScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (provider.receipts.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.receipt_long,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.primary.withAlpha(100),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No receipts yet',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tap the + button to add your first receipt',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
           return Column(
             children: [
               _buildSummaryCard(context, provider),
               _buildCategoryChips(context, provider),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: provider.receipts.length,
-                  itemBuilder: (ctx, i) {
-                    final r = provider.receipts[i];
-                    return Dismissible(
-                      key: Key(r.id?.toString() ?? r.imagePath),
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      direction: DismissDirection.endToStart,
-                      onDismissed: (_) => provider.deleteReceipt(r.id!),
-                      child: ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.file(
-                            File(r.imagePath),
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.broken_image),
+              if (provider.receipts.isEmpty)
+                Expanded(
+                  child: _buildEmptyState(context, provider),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: provider.receipts.length,
+                    itemBuilder: (ctx, i) {
+                      final r = provider.receipts[i];
+                      return Dismissible(
+                        key: Key(r.id?.toString() ?? r.imagePath),
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        direction: DismissDirection.endToStart,
+                        onDismissed: (_) => provider.deleteReceipt(r.id!),
+                        child: ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.file(
+                              File(r.imagePath),
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const Icon(Icons.broken_image),
+                            ),
                           ),
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                r.stationName ?? 'Gas Station',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  r.stationName ??
+                                      CategoryManager.vendorLabel(r.category),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                            Chip(
-                              label: Text(
-                                ExpenseCategory.displayName(r.category),
-                                style: const TextStyle(fontSize: 10),
+                              Chip(
+                                label: Text(
+                                  CategoryManager.displayName(
+                                    r.category, provider.customCategories),
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: CategoryManager.color(
+                                  r.category, provider.customCategories)
+                                    .withAlpha(40),
+                                side: BorderSide(
+                                  color: CategoryManager.color(
+                                    r.category, provider.customCategories),
+                                ),
                               ),
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: ExpenseCategory.color(r.category)
-                                  .withAlpha(40),
-                              side: BorderSide(
-                                color: ExpenseCategory.color(r.category),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          subtitle: Text(
+                            '${DateFormat('MM/dd/yyyy').format(r.date)} • ${r.amount != null ? '\$${r.amount!.toStringAsFixed(2)}' : '--'}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _showReceiptDetail(context, r),
+                          onLongPress: () => _showReceiptActions(context, r),
                         ),
-                        subtitle: Text(
-                          '${DateFormat('MM/dd/yyyy').format(r.date)} • ${r.amount != null ? '\$${r.amount!.toStringAsFixed(2)}' : '--'}',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showReceiptDetail(context, r),
-                        onLongPress: () => _showReceiptActions(context, r),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
             ],
           );
         },
@@ -190,6 +176,17 @@ class HomeScreen extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.folder),
+            title: const Text('Categories'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.file_upload),
             title: const Text('Export'),
             onTap: () {
@@ -212,6 +209,44 @@ class HomeScreen extends StatelessWidget {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, ReceiptProvider provider) {
+    final hasActiveFilter = provider.totalExpenses > 0 ||
+        (provider.receipts.isEmpty &&
+            (provider.filterCategory != null ||
+                provider.filterVehicleId != null ||
+                provider.filterStart != null));
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long,
+            size: 64,
+            color: Theme.of(context).colorScheme.primary.withAlpha(100),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            hasActiveFilter ? 'No receipts match filters' : 'No receipts yet',
+            style: const TextStyle(fontSize: 18),
+          ),
+          const SizedBox(height: 8),
+          if (hasActiveFilter)
+            TextButton.icon(
+              onPressed: () => provider.clearFilter(),
+              icon: const Icon(Icons.clear),
+              label: const Text('Clear All Filters'),
+            )
+          else
+            const Text(
+              'Tap the + button to add your first receipt',
+              style: TextStyle(color: Colors.grey),
+            ),
         ],
       ),
     );
@@ -263,6 +298,14 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryChips(BuildContext context, ReceiptProvider provider) {
+    final builtIn = [
+      'gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other',
+    ];
+    final allIds = [
+      ...builtIn,
+      ...provider.customCategories.map((c) => c.id),
+    ];
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -274,13 +317,18 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => provider.setCategoryFilter(null),
           ),
           const SizedBox(width: 8),
-          ...ExpenseCategory.all.map((c) {
+          ...allIds.map((id) {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ActionChip(
-                avatar: Icon(ExpenseCategory.icon(c), size: 16),
-                label: Text(ExpenseCategory.displayName(c)),
-                onPressed: () => provider.setCategoryFilter(c),
+                avatar: Icon(
+                  CategoryManager.icon(id, provider.customCategories),
+                  size: 16,
+                ),
+                label: Text(
+                  CategoryManager.displayName(id, provider.customCategories),
+                ),
+                onPressed: () => provider.setCategoryFilter(id),
               ),
             );
           }),
@@ -520,7 +568,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _showReceiptDetail(BuildContext context, receipt) {
+  void _showReceiptDetail(BuildContext context, Receipt receipt) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -538,14 +586,17 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    receipt.stationName ?? 'Gas Station',
+                    receipt.stationName ??
+                        CategoryManager.vendorLabel(receipt.category),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Date: ${DateFormat('MM/dd/yyyy').format(receipt.date)}',
                   ),
-                  Text('Category: ${ExpenseCategory.displayName(receipt.category)}'),
+                  Text(
+                    'Category: ${CategoryManager.displayName(receipt.category, context.read<ReceiptProvider>().customCategories)}',
+                  ),
                   if (receipt.amount != null)
                     Text('Amount: \$${receipt.amount!.toStringAsFixed(2)}'),
                   if (receipt.notes != null && receipt.notes!.isNotEmpty)
@@ -553,9 +604,21 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showEditReceiptDialog(context, receipt);
+                  },
+                  child: const Text('Edit'),
+                ),
+              ],
             ),
           ],
         ),
@@ -563,13 +626,21 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _showReceiptActions(BuildContext context, receipt) {
+  void _showReceiptActions(BuildContext context, Receipt receipt) {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit Receipt'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditReceiptDialog(context, receipt);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.archive),
               title: const Text('Archive Receipt'),
@@ -588,6 +659,159 @@ class HomeScreen extends StatelessWidget {
                 context.read<ReceiptProvider>().deleteReceipt(receipt.id!);
                 Navigator.pop(ctx);
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditReceiptDialog(BuildContext context, Receipt receipt) {
+    final amountController = TextEditingController(
+      text: receipt.amount?.toStringAsFixed(2) ?? '',
+    );
+    final stationController = TextEditingController(
+      text: receipt.stationName ?? '',
+    );
+    final notesController = TextEditingController(
+      text: receipt.notes ?? '',
+    );
+    var selectedDate = receipt.date;
+    var selectedCategory = receipt.category;
+    var selectedVehicleId = receipt.vehicleId;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Edit Receipt'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    'gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other',
+                    ...context.read<ReceiptProvider>().customCategories.map((c) => c.id),
+                  ].map((id) {
+                    return DropdownMenuItem(
+                      value: id,
+                      child: Text(
+                        CategoryManager.displayName(
+                          id, context.read<ReceiptProvider>().customCategories),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setState(() => selectedCategory = v!),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: r'Amount ($)',
+                    prefixIcon: Icon(Icons.attach_money),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: stationController,
+                  decoration: InputDecoration(
+                    labelText: CategoryManager.vendorLabel(selectedCategory),
+                    prefixIcon: Icon(CategoryManager.vendorIcon(selectedCategory)),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 1)),
+                    );
+                    if (picked != null) {
+                      setState(() => selectedDate = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Date',
+                      prefixIcon: Icon(Icons.calendar_today),
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Text(DateFormat('MM/dd/yyyy').format(selectedDate)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (context.read<ReceiptProvider>().vehicles.isNotEmpty)
+                  DropdownButtonFormField<int?>(
+                    value: selectedVehicleId,
+                    decoration: const InputDecoration(
+                      labelText: 'Vehicle',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('No vehicle'),
+                      ),
+                      ...context.read<ReceiptProvider>().vehicles.map((v) {
+                        return DropdownMenuItem(
+                          value: v.id,
+                          child: Text(v.name),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) => setState(() => selectedVehicleId = v),
+                  ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes',
+                    prefixIcon: Icon(Icons.notes),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final updated = receipt.copyWith(
+                  amount: double.tryParse(
+                    amountController.text.replaceAll(',', ''),
+                  ),
+                  stationName: stationController.text.isEmpty
+                      ? null
+                      : stationController.text,
+                  notes: notesController.text.isEmpty ? null : notesController.text,
+                  date: selectedDate,
+                  category: selectedCategory,
+                  vehicleId: selectedVehicleId,
+                );
+                context.read<ReceiptProvider>().updateReceipt(updated);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Receipt updated')),
+                );
+              },
+              child: const Text('Save'),
             ),
           ],
         ),

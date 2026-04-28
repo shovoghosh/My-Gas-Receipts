@@ -19,7 +19,8 @@ void main() async {
           create: (_) => ReceiptProvider()
             ..loadReceipts()
             ..loadVehicles()
-            ..loadMileage(),
+            ..loadMileage()
+            ..loadCustomCategories(),
         ),
       ],
       child: const MyApp(),

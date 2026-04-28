@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/receipt.dart';
 import '../models/vehicle.dart';
 import '../models/mileage_entry.dart';
+import '../models/expense_category.dart';
 import '../services/database_service.dart';
 import '../services/image_service.dart';
 
@@ -21,6 +22,9 @@ class ReceiptProvider extends ChangeNotifier {
   List<MileageEntry> _mileageEntries = [];
   List<MileageEntry> get mileageEntries => _mileageEntries;
 
+  List<CustomCategory> _customCategories = [];
+  List<CustomCategory> get customCategories => _customCategories;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -34,6 +38,11 @@ class ReceiptProvider extends ChangeNotifier {
   DateTime? _filterEnd;
   String? _filterCategory;
   int? _filterVehicleId;
+
+  DateTime? get filterStart => _filterStart;
+  DateTime? get filterEnd => _filterEnd;
+  String? get filterCategory => _filterCategory;
+  int? get filterVehicleId => _filterVehicleId;
 
   DateTime? _mileageFilterStart;
   DateTime? _mileageFilterEnd;
@@ -54,6 +63,11 @@ class ReceiptProvider extends ChangeNotifier {
       category: _filterCategory,
     );
     _setLoading(false);
+  }
+
+  Future<void> updateReceipt(Receipt receipt) async {
+    await _db.updateReceipt(receipt);
+    await loadReceipts();
   }
 
   Future<void> captureReceipt({
@@ -198,6 +212,27 @@ class ReceiptProvider extends ChangeNotifier {
     _mileageFilterStart = null;
     _mileageFilterEnd = null;
     loadMileage();
+  }
+
+  // Custom Categories
+  Future<void> loadCustomCategories() async {
+    _customCategories = await CategoryManager.loadCustom();
+    notifyListeners();
+  }
+
+  Future<void> addCustomCategory(CustomCategory category) async {
+    await CategoryManager.addCategory(category);
+    await loadCustomCategories();
+  }
+
+  Future<void> updateCustomCategory(CustomCategory category) async {
+    await CategoryManager.updateCategory(category);
+    await loadCustomCategories();
+  }
+
+  Future<void> deleteCustomCategory(String id) async {
+    await CategoryManager.deleteCategory(id);
+    await loadCustomCategories();
   }
 
   // Filters
