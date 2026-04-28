@@ -55,6 +55,37 @@ class ImageService {
     return result?.path;
   }
 
+  Future<List<String>> pickMultipleImages() async {
+    final picked = await _picker.pickMultiImage(
+      maxWidth: 1800,
+      imageQuality: 85,
+    );
+
+    if (picked.isEmpty) return [];
+
+    final dir = await getApplicationDocumentsDirectory();
+    final paths = <String>[];
+
+    for (final file in picked) {
+      final fileName = 'receipt_${DateTime.now().millisecondsSinceEpoch}_${paths.length}.jpg';
+      final targetPath = p.join(dir.path, fileName);
+
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.path,
+        targetPath,
+        quality: 70,
+        minWidth: 1200,
+        rotate: 0,
+      );
+
+      if (result != null) {
+        paths.add(result.path);
+      }
+    }
+
+    return paths;
+  }
+
   Future<void> deleteImage(String path) async {
     final file = File(path);
     if (await file.exists()) {

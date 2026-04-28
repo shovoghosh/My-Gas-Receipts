@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../models/expense_category.dart';
 import '../providers/receipt_provider.dart';
+import '../services/csv_service.dart';
 import '../services/pdf_service.dart';
 
 class ExportScreen extends StatefulWidget {
@@ -15,6 +17,10 @@ class _ExportScreenState extends State<ExportScreen> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   bool _isExporting = false;
+  bool _isPdf = true;
+  bool _archiveAfterExport = false;
+  String? _selectedCategory;
+  int? _selectedVehicleId;
 
   Future<void> _pickStartDate() async {
     final picked = await showDatePicker(
@@ -43,17 +49,23 @@ class _ExportScreenState extends State<ExportScreen> {
   Future<void> _export() async {
     final provider = context.read<ReceiptProvider>();
 
+    // Temporarily apply filters to get the right subset
+    provider.setDateFilter(_startDate, _endDate);
+    if (_selectedCategory != null) {
+      provider.setCategoryFilter(_selectedCategory);
+    }
+    if (_selectedVehicleId != null) {
+      provider.setVehicleFilter(_selectedVehicleId);
+    }
+
     await provider.loadReceipts();
-    final filtered = provider.receipts.where((r) {
-      return r.date.isAfter(_startDate.subtract(const Duration(days: 1))) &&
-          r.date.isBefore(_endDate.add(const Duration(days: 1)));
-    }).toList();
+    final filtered = provider.receipts.toList();
 
     if (!mounted) return;
 
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No receipts in selected date range')),
+        const SnackBar(content: Text('No receipts in selected range')),
       );
       return;
     }
@@ -63,7 +75,21 @@ class _ExportScreenState extends State<ExportScreen> {
     try {
       final label =
           '${DateFormat('MM/dd/yyyy').format(_startDate)} - ${DateFormat('MM/dd/yyyy').format(_endDate)}';
-      await PdfService.exportReceipts(filtered, taxPeriodLabel: label);
+
+      if (_isPdf) {
+        await PdfService.exportReceipts(filtered, taxPeriodLabel: label);
+      } else {
+        await CsvService.exportReceipts(
+          filtered,
+          taxPeriodLabel: label,
+          vehicles: provider.vehicles,
+        );
+      }
+
+      if (_archiveAfterExport) {
+        final ids = filtered.map((r) => r.id!).toList();
+        await provider.archiveReceipts(ids);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -77,6 +103,8 @@ class _ExportScreenState extends State<ExportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<ReceiptProvider>();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Export Receipts')),
       body: Padding(
@@ -84,11 +112,28 @@ class _ExportScreenState extends State<ExportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Select Date Range',
-              style: Theme.of(context).textTheme.titleLarge,
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text('PDF'),
+                  icon: Icon(Icons.picture_as_pdf),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text('CSV'),
+                  icon: Icon(Icons.table_chart),
+                ),
+              ],
+              selected: {_isPdf},
+              onSelectionChanged: (set) => setState(() => _isPdf = set.first),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            Text(
+              'Date Range',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -122,12 +167,58 @@ class _ExportScreenState extends State<ExportScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Quick Select',
-              style: Theme.of(context).textTheme.titleMedium,
+            const SizedBox(height: 16),
+            if (provider.vehicles.isNotEmpty)
+              DropdownButtonFormField<int?>(
+                value: _selectedVehicleId,
+                decoration: const InputDecoration(
+                  labelText: 'Vehicle Filter',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('All Vehicles'),
+                  ),
+                  ...provider.vehicles.map((v) {
+                    return DropdownMenuItem(
+                      value: v.id,
+                      child: Text(v.name),
+                    );
+                  }),
+                ],
+                onChanged: (v) => setState(() => _selectedVehicleId = v),
+              ),
+            if (provider.vehicles.isNotEmpty) const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: 'Category Filter',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem(
+                  value: null,
+                  child: Text('All Categories'),
+                ),
+                ...ExpenseCategory.all.map((c) {
+                  return DropdownMenuItem(
+                    value: c,
+                    child: Text(ExpenseCategory.displayName(c)),
+                  );
+                }),
+              ],
+              onChanged: (v) => setState(() => _selectedCategory = v),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('Archive receipts after export'),
+              subtitle: const Text('Marks exported receipts as archived'),
+              value: _archiveAfterExport,
+              onChanged: (v) => setState(() => _archiveAfterExport = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            const Spacer(),
             Wrap(
               spacing: 8,
               children: [
@@ -177,7 +268,7 @@ class _ExportScreenState extends State<ExportScreen> {
                 ),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -188,8 +279,8 @@ class _ExportScreenState extends State<ExportScreen> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.picture_as_pdf),
-                label: Text(_isExporting ? 'Exporting...' : 'Export as PDF'),
+                    : Icon(_isPdf ? Icons.picture_as_pdf : Icons.table_chart),
+                label: Text(_isExporting ? 'Exporting...' : 'Export'),
               ),
             ),
           ],

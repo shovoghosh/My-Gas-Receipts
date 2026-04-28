@@ -6,6 +6,9 @@ class Receipt {
   final String? stationName;
   final String? notes;
   final DateTime createdAt;
+  final int? vehicleId;
+  final String category;
+  final bool isArchived;
 
   Receipt({
     this.id,
@@ -15,6 +18,9 @@ class Receipt {
     this.stationName,
     this.notes,
     required this.createdAt,
+    this.vehicleId,
+    this.category = 'gas',
+    this.isArchived = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -25,6 +31,9 @@ class Receipt {
         'stationName': stationName,
         'notes': notes,
         'createdAt': createdAt.toIso8601String(),
+        'vehicleId': vehicleId,
+        'category': category,
+        'isArchived': isArchived ? 1 : 0,
       };
 
   factory Receipt.fromMap(Map<String, dynamic> map) => Receipt(
@@ -35,6 +44,9 @@ class Receipt {
         stationName: map['stationName'] as String?,
         notes: map['notes'] as String?,
         createdAt: DateTime.parse(map['createdAt'] as String),
+        vehicleId: map['vehicleId'] as int?,
+        category: map['category'] as String? ?? 'gas',
+        isArchived: (map['isArchived'] as int?) == 1,
       );
 
   Receipt copyWith({
@@ -45,6 +57,9 @@ class Receipt {
     String? stationName,
     String? notes,
     DateTime? createdAt,
+    int? vehicleId,
+    String? category,
+    bool? isArchived,
   }) {
     return Receipt(
       id: id ?? this.id,
@@ -54,6 +69,9 @@ class Receipt {
       stationName: stationName ?? this.stationName,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      vehicleId: vehicleId ?? this.vehicleId,
+      category: category ?? this.category,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 }

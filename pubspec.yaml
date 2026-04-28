@@ -45,6 +45,10 @@ dependencies:
   provider: ^6.1.2
   permission_handler: ^11.3.1
   google_mlkit_text_recognition: ^0.13.0
+  local_auth: ^2.3.0
+  flutter_local_notifications: ^17.2.2
+  csv: ^6.0.0
+  shared_preferences: ^2.2.3
 
 dev_dependencies:
   flutter_test:
