@@ -7,6 +7,7 @@ import '../models/expense_category.dart';
 import '../providers/receipt_provider.dart';
 import '../services/image_service.dart';
 import '../services/ocr_service.dart';
+import '../theme/app_theme.dart';
 
 class CaptureScreen extends StatefulWidget {
   final ImageSource source;
@@ -84,11 +85,34 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   Future<void> _saveReceipt({bool addAnother = false}) async {
-    final amount = double.tryParse(_amountController.text.replaceAll(',', ''));
+    if (_previewPath == null) return;
 
-    await context.read<ReceiptProvider>().captureReceipt(
+    final stationName = _stationController.text.trim();
+    if (stationName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please enter ${CategoryManager.vendorLabel(_category).toLowerCase()} before saving',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final amount = double.tryParse(_amountController.text.replaceAll(',', ''));
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid amount before saving'),
+        ),
+      );
+      return;
+    }
+
+    await context.read<ReceiptProvider>().saveReceiptFromPath(
+      path: _previewPath!,
       amount: amount,
-      stationName: _stationController.text.isEmpty ? null : _stationController.text,
+      stationName: stationName,
       notes: _notesController.text.isEmpty ? null : _notesController.text,
       date: _selectedDate,
       category: _category,
@@ -100,6 +124,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         _amountController.clear();
         _stationController.clear();
         _notesController.clear();
+        _selectedDate = DateTime.now();
         _captureImage();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Receipt saved. Capture another.')),
@@ -166,15 +191,29 @@ class _CaptureScreenState extends State<CaptureScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Receipt'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           if (_isScanning)
             const Padding(
               padding: EdgeInsets.only(right: 16),
               child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome, size: 16, color: AppTokens.brandCyan),
+                    SizedBox(width: 6),
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTokens.brandCyan,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -188,21 +227,26 @@ class _CaptureScreenState extends State<CaptureScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (_previewPath != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(_previewPath!),
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                    GlassCard(
+                      padding: EdgeInsets.zero,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppTokens.rLg),
+                        child: Image.file(
+                          File(_previewPath!),
+                          height: 220,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
-                  const SizedBox(height: 16),
+                    )
+                  else
+                    const SizedBox.shrink(),
                   DropdownButtonFormField<String>(
                     value: _category,
                     decoration: const InputDecoration(
                       labelText: 'Category',
-                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.category_outlined),
                     ),
                     items: _buildCategoryItems(provider),
                     onChanged: (v) => setState(() => _category = v!),
@@ -213,7 +257,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       value: _vehicleId,
                       decoration: const InputDecoration(
                         labelText: 'Vehicle',
-                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.directions_car_outlined),
                       ),
                       items: [
                         const DropdownMenuItem(
@@ -234,32 +278,33 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     controller: _amountController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 18),
                     decoration: const InputDecoration(
-                      labelText: r'Amount ($)',
+                      labelText: r'Amount ($) *',
                       prefixIcon: Icon(Icons.attach_money),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _stationController,
                     decoration: InputDecoration(
-                      labelText: CategoryManager.vendorLabel(_category),
+                      labelText: '${CategoryManager.vendorLabel(_category)} *',
                       prefixIcon: Icon(CategoryManager.vendorIcon(_category)),
-                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(AppTokens.rMd),
                     child: InputDecorator(
                       decoration: const InputDecoration(
                         labelText: 'Date',
-                        prefixIcon: Icon(Icons.calendar_today),
-                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_today_outlined),
                       ),
                       child: Text(
-                        DateFormat('MM/dd/yyyy').format(_selectedDate),
+                        DateFormat('EEE, MMM d, yyyy').format(_selectedDate),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -270,7 +315,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Notes',
                       prefixIcon: Icon(Icons.notes),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -280,15 +324,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () => _saveReceipt(addAnother: true),
                           icon: const Icon(Icons.add),
-                          label: const Text('Save & Add Another'),
+                          label: const Text('Save & Add'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: FilledButton.icon(
+                        child: GradientFab(
+                          icon: Icons.check,
+                          label: 'Save',
                           onPressed: () => _saveReceipt(),
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save'),
                         ),
                       ),
                     ],

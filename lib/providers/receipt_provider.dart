@@ -77,22 +77,17 @@ class ReceiptProvider extends ChangeNotifier {
     DateTime? date,
     String? category,
     int? vehicleId,
+    required String imagePath,
   }) async {
-    final path = await _imageService.captureAndSaveReceipt();
-    if (path == null) return;
-
-    final receipt = Receipt(
-      imagePath: path,
+    await saveReceiptFromPath(
+      path: imagePath,
       amount: amount,
-      date: date ?? DateTime.now(),
       stationName: stationName,
       notes: notes,
-      createdAt: DateTime.now(),
-      category: category ?? 'gas',
-      vehicleId: vehicleId ?? _defaultVehicle?.id,
+      date: date,
+      category: category,
+      vehicleId: vehicleId,
     );
-
-    await _db.insertReceipt(receipt);
     await loadReceipts();
   }
 
@@ -166,6 +161,11 @@ class ReceiptProvider extends ChangeNotifier {
 
   Future<void> addVehicle(Vehicle vehicle) async {
     await _db.insertVehicle(vehicle);
+    await loadVehicles();
+  }
+
+  Future<void> updateVehicle(Vehicle vehicle) async {
+    await _db.updateVehicle(vehicle);
     await loadVehicles();
   }
 

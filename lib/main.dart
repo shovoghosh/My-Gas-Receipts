@@ -6,6 +6,7 @@ import 'providers/theme_provider.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,12 +39,14 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   bool _requiresAuth = false;
+  bool _splashDone = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkBiometricSetting();
+    _runSplash();
   }
 
   @override
@@ -55,6 +58,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Future<void> _checkBiometricSetting() async {
     final prefs = await SharedPreferences.getInstance();
     _requiresAuth = prefs.getBool('biometric_enabled') ?? false;
+  }
+
+  Future<void> _runSplash() async {
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (mounted) setState(() => _splashDone = true);
   }
 
   @override
@@ -75,52 +83,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'My Gas Receipts',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.green,
-              brightness: Brightness.light,
-            ),
-            useMaterial3: true,
-            cardTheme: CardTheme(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-          ),
-          darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.green,
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            cardTheme: CardTheme(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-          ),
-          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          home: const HomeScreen(),
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: themeProvider.mode,
+          home: _splashDone ? const HomeScreen() : const SplashScreen(),
         );
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/expense_category.dart';
 import '../providers/receipt_provider.dart';
+import '../theme/app_theme.dart';
 
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
@@ -9,81 +10,95 @@ class CategoriesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
+      appBar: AppBar(
+        title: const Text('Categories'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Consumer<ReceiptProvider>(
         builder: (context, provider, _) {
-          final builtIn = ['gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other'];
+          final builtIn = [
+            'gas', 'maintenance', 'insurance', 'tolls', 'parking', 'other',
+          ];
+          final scheme = Theme.of(context).colorScheme;
 
           return ListView(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              Text(
-                'Built-in',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+              _SectionHeader(title: 'BUILT-IN'),
+              GlassCard(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < builtIn.length; i++) ...[
+                      _CategoryRow(
+                        icon: CategoryManager.icon(
+                            builtIn[i], provider.customCategories),
+                        color: CategoryManager.color(
+                            builtIn[i], provider.customCategories),
+                        name: CategoryManager.displayName(
+                            builtIn[i], provider.customCategories),
+                        locked: true,
+                      ),
+                      if (i < builtIn.length - 1)
+                        const Divider(height: 1, indent: 56),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              ...builtIn.map((id) {
-                return ListTile(
-                  leading: Icon(
-                    CategoryManager.icon(id, provider.customCategories),
-                    color: CategoryManager.color(id, provider.customCategories),
-                  ),
-                  title: Text(
-                    CategoryManager.displayName(id, provider.customCategories),
-                  ),
-                  trailing: const Icon(Icons.lock, size: 16, color: Colors.grey),
-                );
-              }),
-              const Divider(height: 32),
               Row(
                 children: [
-                  Text(
-                    'Custom',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
+                  const _SectionHeader(title: 'CUSTOM', inline: true),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: () => _showAddCategoryDialog(context),
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(Icons.add, size: 18),
                     label: const Text('Add'),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
               if (provider.customCategories.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'No custom categories yet. Tap Add to create one.',
-                    style: TextStyle(color: Colors.grey),
+                GlassCard(
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline,
+                          color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'No custom categories yet. Tap Add to create one for things like car washes or tolls.',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
                   ),
                 )
               else
-                ...provider.customCategories.map((c) {
-                  return ListTile(
-                    leading: Icon(c.icon, color: c.color),
-                    title: Text(c.name),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () => _showEditCategoryDialog(context, c),
+                GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      for (var i = 0;
+                          i < provider.customCategories.length;
+                          i++) ...[
+                        _CategoryRow(
+                          icon: provider.customCategories[i].icon,
+                          color: provider.customCategories[i].color,
+                          name: provider.customCategories[i].name,
+                          onEdit: () => _showEditCategoryDialog(
+                              context, provider.customCategories[i]),
+                          onDelete: () => _confirmDelete(
+                              context, provider.customCategories[i]),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                          onPressed: () => _confirmDelete(context, c),
-                        ),
+                        if (i < provider.customCategories.length - 1)
+                          const Divider(height: 1, indent: 56),
                       ],
-                    ),
-                  );
-                }),
+                    ],
+                  ),
+                ),
             ],
           );
         },
@@ -110,7 +125,6 @@ class CategoriesScreen extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: 'Category Name',
                     hintText: 'e.g. Car Wash',
-                    border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -190,7 +204,7 @@ class CategoriesScreen extends StatelessWidget {
                   id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
                   name: nameController.text.trim(),
                   iconName: iconName,
-                  colorValue: selectedColor.value,
+                  colorValue: selectedColor.toARGB32(),
                 );
 
                 context.read<ReceiptProvider>().addCustomCategory(category);
@@ -222,7 +236,6 @@ class CategoriesScreen extends StatelessWidget {
                   controller: nameController,
                   decoration: const InputDecoration(
                     labelText: 'Category Name',
-                    border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -301,7 +314,7 @@ class CategoriesScreen extends StatelessWidget {
                   id: category.id,
                   name: nameController.text.trim(),
                   iconName: _iconToName(selectedIcon),
-                  colorValue: selectedColor.value,
+                  colorValue: selectedColor.toARGB32(),
                 );
 
                 context.read<ReceiptProvider>().updateCustomCategory(updated);
@@ -365,5 +378,88 @@ class CategoriesScreen extends StatelessWidget {
     if (icon == Icons.local_shipping) return 'local_shipping';
     if (icon == Icons.attach_money) return 'attach_money';
     return 'receipt';
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final bool inline;
+
+  const _SectionHeader({required this.title, this.inline = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(4, inline ? 0 : 8, 4, 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: scheme.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String name;
+  final bool locked;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _CategoryRow({
+    required this.icon,
+    required this.color,
+    required this.name,
+    this.locked = false,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withAlpha(35),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (locked)
+            Icon(Icons.lock_outline, size: 16, color: scheme.onSurfaceVariant)
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              onPressed: onEdit,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete_outline,
+                  size: 20, color: scheme.error),
+              onPressed: onDelete,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

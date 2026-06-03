@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/mileage_entry.dart';
 import '../providers/receipt_provider.dart';
+import '../theme/app_theme.dart';
 
 class MileageScreen extends StatelessWidget {
   const MileageScreen({super.key});
@@ -12,9 +13,13 @@ class MileageScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mileage Tracker'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.tune),
             onPressed: () => _showFilterDialog(context),
           ),
         ],
@@ -22,118 +27,157 @@ class MileageScreen extends StatelessWidget {
       body: Consumer<ReceiptProvider>(
         builder: (context, provider, _) {
           if (provider.mileageEntries.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.speed,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.primary.withAlpha(100),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('No mileage entries yet', style: TextStyle(fontSize: 18)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Track miles for IRS standard mileage deduction',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
+            return const EmptyState(
+              icon: Icons.speed,
+              title: 'No mileage entries yet',
+              subtitle:
+                  'Track miles for IRS standard mileage deduction. Tap + to log your first trip.',
             );
           }
 
-          return Column(
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             children: [
               _buildSummaryCard(context, provider),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: provider.mileageEntries.length,
-                  itemBuilder: (ctx, i) {
-                    final e = provider.mileageEntries[i];
-                    return Dismissible(
-                      key: Key(e.id?.toString() ?? e.createdAt.toIso8601String()),
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
+              const SizedBox(height: 16),
+              ...provider.mileageEntries.map((e) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Dismissible(
+                    key:
+                        Key(e.id?.toString() ?? e.createdAt.toIso8601String()),
+                    background: Container(
+                      decoration: BoxDecoration(
+                        color: AppTokens.danger,
+                        borderRadius:
+                            BorderRadius.circular(AppTokens.rLg),
                       ),
-                      direction: DismissDirection.endToStart,
-                      onDismissed: (_) => provider.deleteMileageEntry(e.id!),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          child: Text(e.miles.toStringAsFixed(0)),
-                        ),
-                        title: Text(
-                          DateFormat('MM/dd/yyyy').format(e.date),
-                        ),
-                        subtitle: Text(
-                          '${e.startOdometer.toStringAsFixed(1)} → ${e.endOdometer.toStringAsFixed(1)} mi',
-                        ),
-                        trailing: Text(
-                          '${e.miles.toStringAsFixed(1)} mi',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        onTap: () => _showEntryDetail(context, e),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child:
+                          const Icon(Icons.delete, color: Colors.white),
+                    ),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (_) => provider.deleteMileageEntry(e.id!),
+                    child: GlassCard(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      onTap: () => _showEntryDetail(context, e),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppTokens.brandCyan.withAlpha(35),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.route_outlined,
+                              color: AppTokens.brandCyan,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  DateFormat('MMM d, yyyy').format(e.date),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${e.startOdometer.toStringAsFixed(1)} → ${e.endOdometer.toStringAsFixed(1)} mi'
+                                  '${e.purpose != null ? ' · ${e.purpose}' : ''}',
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontSize: 12.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${e.miles.toStringAsFixed(1)} mi',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-              ),
+                    ),
+                  ),
+                );
+              }),
             ],
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: GradientFab(
+        icon: Icons.add_road,
+        label: 'Log Miles',
         onPressed: () => _showAddEntryDialog(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Log Miles'),
       ),
     );
   }
 
   Widget _buildSummaryCard(BuildContext context, ReceiptProvider provider) {
-    return Card(
-      margin: const EdgeInsets.all(12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Total Miles',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    provider.totalMiles.toStringAsFixed(1),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      gradient: AppTokens.brandGradient,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${provider.mileageEntries.length}',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  'TOTAL MILES',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(220),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
                 ),
+                const SizedBox(height: 6),
                 Text(
-                  'Trips',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  provider.totalMiles.toStringAsFixed(1),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${provider.mileageEntries.length} trips logged',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(200),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(40),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.timeline, color: Colors.white, size: 24),
+          ),
+        ],
       ),
     );
   }
